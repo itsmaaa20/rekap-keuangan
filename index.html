@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Keuangan Harian</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body{
+  font-family:"Segoe UI",Arial;
+  background:linear-gradient(135deg,#cfe9ff,#e6f3ff);
+  padding:30px;
+}
+.container{
+  max-width:1000px;
+  margin:auto;
+  background:white;
+  padding:25px;
+  border-radius:18px;
+  box-shadow:0 10px 25px rgba(0,0,0,.1);
+}
+h2{text-align:center;color:#3b82f6;margin-bottom:10px;}
+.hidden{display:none;}
+
+input,button{
+  padding:10px;
+  border-radius:10px;
+  border:1px solid #cbd5e1;
+}
+button{
+  background:#60a5fa;
+  color:white;
+  cursor:pointer;
+}
+button:hover{background:#3b82f6;}
+
+.login{
+  max-width:350px;
+  margin:auto;
+  text-align:center;
+}
+
+.summary{
+  display:flex;
+  gap:15px;
+  margin:20px 0;
+}
+.card{
+  flex:1;
+  background:#eff6ff;
+  border-radius:14px;
+  padding:15px;
+  text-align:center;
+}
+.card h4{margin:0;color:#1e40af;}
+.card p{margin:5px 0 0;font-weight:bold;}
+
+.logout{
+  background:#f87171;
+  margin-bottom:10px;
+}
+
+form{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:12px;
+  margin-bottom:20px;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:20px;
+}
+th,td{
+  border:1px solid #e5e7eb;
+  padding:8px;
+  text-align:center;
+}
+th{background:#dbeafe;}
+
+canvas{
+  max-width:400px;
+  margin:30px auto 0;
+  display:block;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<!-- LOGIN -->
+<div id="loginPage" class="login">
+  <h2>💙 Masuk</h2>
+  <input id="username" placeholder="Masukkan nama">
+  <br><br>
+  <button onclick="login()">Masuk</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="hidden">
+  <h2>📒 Keuangan <span id="userLabel"></span></h2>
+  <button class="logout" onclick="logout()">Logout</button>
+
+  <!-- KOTAK RINGKASAN -->
+  <div class="summary">
+    <div class="card">
+      <h4>Pemasukan Bulan Ini</h4>
+      <p>Rp <span id="masukBulanan">0</span></p>
+    </div>
+    <div class="card">
+      <h4>Pengeluaran Bulan Ini</h4>
+      <p>Rp <span id="keluarBulanan">0</span></p>
+    </div>
+    <div class="card">
+      <h4>Saldo</h4>
+      <p>Rp <span id="saldo">0</span></p>
+    </div>
+  </div>
+
+  <!-- FORM -->
+  <form id="form">
+    <input type="date" id="tanggal" required>
+    <input type="time" id="jam" required>
+    <input type="number" id="pemasukan" placeholder="Pemasukan">
+    <input type="number" id="pengeluaran" placeholder="Pengeluaran">
+    <input type="text" id="catatan" placeholder="Catatan">
+    <button>Simpan</button>
+  </form>
+
+  <!-- TABEL -->
+  <table>
+    <thead>
+      <tr>
+        <th>Tanggal</th>
+        <th>Jam</th>
+        <th>Pemasukan</th>
+        <th>Pengeluaran</th>
+        <th>Catatan</th>
+      </tr>
+    </thead>
+    <tbody id="dataTable"></tbody>
+  </table>
+
+  <!-- GRAFIK -->
+  <canvas id="chart"></canvas>
+</div>
+
+</div>
+
+<script>
+let currentUser = localStorage.getItem("currentUser");
+let data = [];
+let chart;
+
+function rupiah(n){return n.toLocaleString("id-ID");}
+
+function login(){
+  const name = username.value.trim();
+  if(!name) return alert("Nama harus diisi");
+  localStorage.setItem("currentUser",name);
+  currentUser=name;
+  init();
+}
+
+function logout(){
+  localStorage.removeItem("currentUser");
+  location.reload();
+}
+
+function init(){
+  loginPage.classList.add("hidden");
+  dashboard.classList.remove("hidden");
+  userLabel.textContent=currentUser;
+  data = JSON.parse(localStorage.getItem("uang_"+currentUser))||[];
+  render();
+}
+
+function render(){
+  dataTable.innerHTML="";
+  let masukB=0, keluarB=0, masukAll=0, keluarAll=0;
+  const bulanIni=new Date().toISOString().slice(0,7);
+
+  data.forEach(d=>{
+    masukAll+=d.pemasukan;
+    keluarAll+=d.pengeluaran;
+    if(d.tanggal.startsWith(bulanIni)){
+      masukB+=d.pemasukan;
+      keluarB+=d.pengeluaran;
+    }
+    dataTable.innerHTML+=`
+      <tr>
+        <td>${d.tanggal}</td>
+        <td>${d.jam}</td>
+        <td>Rp ${rupiah(d.pemasukan)}</td>
+        <td>Rp ${rupiah(d.pengeluaran)}</td>
+        <td>${d.catatan}</td>
+      </tr>`;
+  });
+
+  masukBulanan.textContent=rupiah(masukB);
+  keluarBulanan.textContent=rupiah(keluarB);
+  saldo.textContent=rupiah(masukAll-keluarAll);
+
+  if(chart) chart.destroy();
+  chart=new Chart(document.getElementById("chart"),{
+    type:"doughnut",
+    data:{
+      labels:["Pemasukan","Pengeluaran"],
+      datasets:[{
+        data:[masukB,keluarB],
+        backgroundColor:["#60a5fa","#fca5a5"]
+      }]
+    }
+  });
+}
+
+form.addEventListener("submit",e=>{
+  e.preventDefault();
+  data.push({
+    tanggal:tanggal.value,
+    jam:jam.value,
+    pemasukan:Number(pemasukan.value)||0,
+    pengeluaran:Number(pengeluaran.value)||0,
+    catatan:catatan.value
+  });
+  localStorage.setItem("uang_"+currentUser,JSON.stringify(data));
+  form.reset();
+  render();
+});
+
+if(currentUser) init();
+</script>
+
+</body>
+</html>
